@@ -1,0 +1,822 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>練習プレイヤー（試用版）</title>
+<script>window.RENSHU_TRIAL = true;</script>
+<meta name="description" content="マーカー・A-Bリピート・速度変更ができる練習用音楽プレイヤー">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="練習プレイヤー（試用版）">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#1f2633">
+<style>
+:root{
+  --bg:#f3f4f7; --panel:#ffffff; --text:#1b1f27; --muted:#5f6b7c; --line:#d8dde5;
+  --btn:#e9edf3; --btn-press:#d5dce7; --accent:#2563eb; --accent-text:#ffffff;
+  --a:#15803d; --b:#c2410c; --marker:#b45309; --wave:#a3afc0; --played:#2563eb;
+  --loop:rgba(124,58,237,.13); --ab-wave:#c3a6f3; --ab-played:#7c3aed;
+  --head:#111827; --on:#16a34a; --danger:#b91c1c;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#12161d; --panel:#1b212b; --text:#e8ecf2; --muted:#9aa6b6; --line:#2e3744;
+    --btn:#28303c; --btn-press:#343e4d; --accent:#3b82f6; --accent-text:#ffffff;
+    --a:#4ade80; --b:#fb923c; --marker:#fbbf24; --wave:#4b5768; --played:#60a5fa;
+    --loop:rgba(167,139,250,.16); --ab-wave:#6f5a9e; --ab-played:#b79cff;
+    --head:#f8fafc; --on:#22c55e; --danger:#f87171;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#12161d; --panel:#1b212b; --text:#e8ecf2; --muted:#9aa6b6; --line:#2e3744;
+  --btn:#28303c; --btn-press:#343e4d; --accent:#3b82f6; --accent-text:#ffffff;
+  --a:#4ade80; --b:#fb923c; --marker:#fbbf24; --wave:#4b5768; --played:#60a5fa;
+  --loop:rgba(167,139,250,.16); --ab-wave:#6f5a9e; --ab-played:#b79cff;
+  --head:#f8fafc; --on:#22c55e; --danger:#f87171;
+  color-scheme: dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif;font-size:17px;-webkit-tap-highlight-color:transparent;overscroll-behavior:none}
+/* iPhone のノッチ・ホームバーに重ならないように */
+body{padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right);padding-bottom:env(safe-area-inset-bottom)}
+button,select,input{font:inherit;color:inherit}
+button{background:var(--btn);border:0;border-radius:12px;min-height:56px;padding:0 14px;cursor:pointer;touch-action:manipulation;user-select:none;font-weight:600}
+button:active{background:var(--btn-press)}
+button.primary{background:var(--accent);color:var(--accent-text)}
+button.on{background:var(--on);color:#fff}
+button.small{min-height:44px;padding:0 10px;font-size:15px}
+button:disabled{opacity:.4}
+.top{position:sticky;top:0;z-index:5;background:var(--bg);padding:10px 16px 8px;border-bottom:1px solid var(--line)}
+.bar{display:flex;gap:10px;align-items:center}
+.bar .title{flex:1;min-width:0;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bar select{flex:1;min-width:0;min-height:48px;border-radius:10px;border:1px solid var(--line);background:var(--panel);padding:0 10px}
+.wavewrap{margin-top:8px;background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+canvas#wave{display:block;width:100%;height:64px;touch-action:none}
+.wavetools{display:flex;gap:6px;align-items:center;padding:6px;border-top:1px solid var(--line);flex-wrap:wrap}
+.wavetools .lbl{color:var(--muted);font-size:14px;margin:0 4px}
+.wavetools .spacer{flex:1}
+.time{font-variant-numeric:tabular-nums;font-size:22px;font-weight:700;text-align:center;margin:8px 0 6px}
+.time small{color:var(--muted);font-size:16px;font-weight:500}
+.transport{display:grid;grid-template-columns:repeat(7,1fr);gap:8px}
+.transport button{font-size:16px;padding:0 4px}
+#play{font-size:26px}
+@media (max-width:520px){
+  .transport{gap:5px} .transport .lg{display:none} .transport button{font-size:17px;white-space:nowrap}
+  .top{padding:8px 12px 8px} main{padding:10px 12px 40px}
+  .pt{min-width:70px;font-size:18px}
+}
+main{padding:12px 16px 40px;display:grid;gap:12px}
+@media (min-width:760px){ main{grid-template-columns:1fr 1fr;align-items:start} .col{display:grid;gap:12px} }
+.col{display:grid;gap:12px}
+/* PC・タブレット（2列）：マーカー一覧をスクロールしても、A-Bリピートと再生速度は画面に残す */
+@media (min-width:760px) and (min-height:561px){
+  .col.side{position:sticky;top:calc(var(--top-h, 0px) + 12px);max-height:calc(100vh - var(--top-h, 0px) - 24px);overflow-y:auto}
+}
+/* スマホを横向きにした時（画面の高さが低い）：左に波形と再生ボタン、右にマーカー・A-B・速度 */
+@media (orientation:landscape) and (max-height:560px){
+  body{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:start}
+  .top{height:100vh;height:100dvh;overflow-y:auto;border-bottom:0;border-right:1px solid var(--line);padding:8px 12px}
+  main{grid-template-columns:1fr;padding:8px 12px 40px}
+  .transport{gap:5px} .transport .lg{display:none} .transport button{white-space:nowrap}
+  .time{margin:4px 0}
+  canvas#wave{max-height:calc(100vh - 250px);max-height:calc(100dvh - 250px);min-height:48px}
+}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px}
+.panel h2{font-size:15px;color:var(--muted);margin:0 0 10px;font-weight:700;letter-spacing:.04em}
+.row{display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap}
+.row:last-child{margin-bottom:0}
+.grow{flex:1}
+.pt{font-variant-numeric:tabular-nums;font-size:20px;font-weight:700;min-width:92px;text-align:center}
+.pt.a{color:var(--a)} .pt.b{color:var(--b)}
+.pt{display:flex;flex-direction:column;align-items:center;line-height:1.2}
+.mno{display:none;margin-top:3px;background:var(--marker);color:#fff;border-radius:6px;padding:1px 7px;font-size:13px;font-weight:800;white-space:nowrap}
+.mno.show{display:inline-block}
+.mrow .ma.sel{background:var(--a);color:#fff} .mrow .mb.sel{background:var(--b);color:#fff}
+.btnA{border-left:6px solid var(--a)} .btnB{border-left:6px solid var(--b)}
+.rate{font-size:34px;font-weight:800;font-variant-numeric:tabular-nums;text-align:center;flex:1}
+.presets{display:grid;grid-template-columns:repeat(6,1fr);gap:6px}
+input[type=range]{width:100%;height:40px;accent-color:var(--accent)}
+/* マーカー一覧：枠内スクロールはせず、ページ全体のスクロールに任せる */
+.phead{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.phead h2{margin:0}
+.mlist{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:6px}
+.mlist.closed{display:none}
+.mrow{display:grid;grid-template-columns:1fr 48px 48px 48px;gap:6px;align-items:stretch;border:1px solid var(--line);border-radius:12px;padding:4px}
+.mrow.near{border-color:var(--marker);box-shadow:inset 4px 0 0 var(--marker)}
+.mrow button{min-height:48px;padding:0}
+.mgo{display:flex;align-items:center;gap:10px;text-align:left;background:transparent;padding:0 6px!important;min-width:0}
+.mnum{background:var(--marker);color:#fff;border-radius:8px;min-width:32px;height:32px;display:grid;place-items:center;font-weight:800;flex:none}
+.mtxt{display:flex;flex-direction:column;min-width:0;line-height:1.25}
+.mtime{font-variant-numeric:tabular-nums;font-weight:700}
+.mlabel{color:var(--muted);font-size:14px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mrow .ma{color:var(--a)} .mrow .mb{color:var(--b)}
+.medit{grid-column:1/-1;display:grid;grid-template-columns:1fr auto auto;gap:6px;padding:4px 2px 2px}
+.medit input{min-width:0;min-height:48px;border-radius:10px;border:1px solid var(--line);background:var(--bg);padding:0 10px}
+.medit button{padding:0 12px!important;white-space:nowrap}
+.medit .del{color:var(--danger)}
+.empty{color:var(--muted);text-align:center;padding:14px 0}
+.hint{color:var(--muted);font-size:14px;line-height:1.6;margin:0}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--head);color:var(--bg);padding:12px 18px;border-radius:12px;font-weight:600;opacity:0;pointer-events:none;transition:opacity .2s;max-width:calc(100% - 32px);z-index:20}
+.toast.show{opacity:.95}
+#trialStop{position:fixed;inset:0;z-index:100;background:var(--bg);display:grid;place-items:center;padding:24px;text-align:center}
+#trialStop h2{font-size:22px;margin:0 0 8px}
+#trialStop p{color:var(--muted);margin:0}
+.hidden{display:none!important}
+</style>
+</head>
+<body>
+<div class="top">
+  <div class="bar">
+    <button class="primary" id="openBtn">📂 曲を開く</button>
+    <select id="songSel" class="hidden" aria-label="曲の選択"></select>
+    <div class="title" id="title">曲が選ばれていません</div>
+    <input type="file" id="fileIn" accept="audio/*,.wav,.mp3,.m4a,.aac,.flac,.ogg,.opus,.wma" multiple hidden>
+  </div>
+  <div class="wavewrap">
+    <canvas id="wave" aria-label="波形（タップで移動、左右ドラッグでスクロール）"></canvas>
+    <div class="wavetools">
+      <span class="lbl">拡大</span>
+      <button class="small" id="zoomOut">－</button>
+      <span class="lbl" id="zoomLbl">×1</span>
+      <button class="small" id="zoomIn">＋</button>
+      <span class="spacer"></span>
+      <span class="lbl">高さ</span>
+      <button class="small" data-h="s">小</button>
+      <button class="small" data-h="m">中</button>
+      <button class="small" data-h="l">大</button>
+    </div>
+  </div>
+  <div class="time"><span id="tCur">0:00.0</span> <small>/ <span id="tDur">0:00.0</span></small></div>
+  <div class="transport">
+    <button id="toStart" title="先頭へ">⏮<span class="lg"> 先頭</span></button>
+    <button id="prevM" title="前のマーカー">◀<span class="lg"> 前</span>M</button>
+    <button id="back5">−5<span class="lg">秒</span></button>
+    <button class="primary" id="play" aria-label="再生/一時停止">▶</button>
+    <button id="fwd5">+5<span class="lg">秒</span></button>
+    <button id="nextM" title="次のマーカー"><span class="lg">次</span>M ▶</button>
+    <button id="addM2" title="マーカー追加">＋M</button>
+  </div>
+</div>
+
+<main>
+  <div class="col">
+    <section class="panel">
+      <div class="phead"><h2>マーカー <span id="mcount"></span></h2><button class="small" id="mToggle">一覧を閉じる</button></div>
+      <button class="primary" id="addM" style="width:100%;min-height:64px;font-size:20px">＋ 今の位置にマーカー</button>
+      <ul class="mlist" id="mlist"></ul>
+    </section>
+  </div>
+
+  <div class="col side">
+    <section class="panel">
+      <h2>A-B リピート</h2>
+      <div class="row">
+        <button class="btnA grow" id="setA">A点をここに</button>
+        <span class="pt a"><span id="aTxt">--:--</span><span class="mno" id="aNo"></span></span>
+        <button class="small" id="aM">−0.1</button>
+        <button class="small" id="aP">+0.1</button>
+      </div>
+      <div class="row">
+        <button class="btnB grow" id="setB">B点をここに</button>
+        <span class="pt b"><span id="bTxt">--:--</span><span class="mno" id="bNo"></span></span>
+        <button class="small" id="bM">−0.1</button>
+        <button class="small" id="bP">+0.1</button>
+      </div>
+      <div class="row">
+        <button class="grow" id="loopBtn">🔁 リピート OFF</button>
+        <button id="goA">A点へ</button>
+        <button id="clearAB">クリア</button>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>再生速度（音の高さはそのまま）</h2>
+      <div class="row">
+        <button id="rM" style="min-width:76px">−5%</button>
+        <div class="rate" id="rateTxt">100%</div>
+        <button id="rP" style="min-width:76px">+5%</button>
+      </div>
+      <div class="row"><input type="range" id="rateRange" min="25" max="200" step="5" value="100" aria-label="再生速度"></div>
+      <div class="presets">
+        <button class="small" data-r="50">50%</button>
+        <button class="small" data-r="60">60%</button>
+        <button class="small" data-r="70">70%</button>
+        <button class="small" data-r="80">80%</button>
+        <button class="small" data-r="90">90%</button>
+        <button class="small" data-r="100">100%</button>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>データ</h2>
+      <p class="hint">マーカーとA-B区間は「ファイル名（拡張子を除く）」で曲ごとに自動保存されます。wavをm4aに変換しても同じ曲として引き継がれます。Sound it! でマーカーを付けたWAVを開くと、そのマーカーも自動で取り込みます。データはこの端末の中だけに保存され、ほかの人や端末には送られません。ブラウザのデータを消すと失われるので、ときどき書き出しておくと安心です。<a href="guide.html">使い方</a></p>
+      <div class="row" style="margin-top:10px">
+        <button class="grow" id="exportBtn">💾 書き出し</button>
+        <button class="grow" id="importBtn">📥 読み込み</button>
+        <input type="file" id="importIn" accept="application/json,.json" hidden>
+      </div>
+    </section>
+  </div>
+</main>
+<div class="toast" id="toast"></div>
+
+<script>
+(() => {
+'use strict';
+const $ = s => document.querySelector(s);
+const PREFIX = 'renshu:song:';
+const PEAKS_PER_SEC = 200;
+const HEIGHTS = { s: 64, m: 120, l: 200 };
+
+/* ---------- storage ---------- */
+const store = {
+  get(k){ try{ const v = localStorage.getItem(k); return v ? JSON.parse(v) : null; }catch(e){ return null; } },
+  set(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)); return true; }catch(e){ return false; } },
+  keys(){ try{ return Object.keys(localStorage); }catch(e){ return []; } }
+};
+try{ navigator.storage && navigator.storage.persist && navigator.storage.persist(); }catch(e){}
+
+/* ---------- state ---------- */
+const audio = new Audio();
+audio.preload = 'auto';
+function setPitchLock(){ try{ audio.preservesPitch = true; audio.webkitPreservesPitch = true; audio.mozPreservesPitch = true; }catch(e){} }
+setPitchLock();
+
+let files = [], curIdx = -1, key = null;
+let song = blankSong();
+let peaks = null, waveMsg = '「曲を開く」から音源を選んでください';
+const prefs = Object.assign({ height: 's' }, store.get('renshu:prefs') || {});
+const view = { start: 0, zoom: 1 };
+let lastUserScroll = 0, lastTime = 0, wakeLock = null, switching = false, lastPosSave = 0;
+
+function blankSong(){ return { markers: [], a: null, b: null, loop: false, rate: 1 }; }
+function save(){ if(key){ song.updated = Date.now(); if(!store.set(key, song)) toast('保存できませんでした（ストレージ不足？）'); } }
+// マーカーを変えた時は、変えた日時も記録（Sound it! 側の変更と、どちらが新しいか比べるため）
+function saveM(){ song.mUpdated = Date.now(); save(); }
+
+/* ---------- helpers ---------- */
+function fmt(t){
+  if(t == null || !isFinite(t)) return '--:--';
+  t = Math.max(0, t);
+  const m = Math.floor(t / 60), s = t - m * 60;
+  return m + ':' + (s < 10 ? '0' : '') + s.toFixed(1);
+}
+let toastTimer;
+function toast(msg){ const el = $('#toast'); el.textContent = msg; el.classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.remove('show'), 2200); }
+const dur = () => (isFinite(audio.duration) ? audio.duration : 0);
+const now = () => audio.currentTime || 0;
+function seek(t){ if(!dur()) return; audio.currentTime = Math.min(Math.max(0, t), dur() - 0.01); lastTime = audio.currentTime; ensureVisible(true); refresh(); }
+function needSong(){ if(curIdx < 0){ toast('先に曲を開いてください'); return true; } return false; }
+
+/* ---------- file loading ---------- */
+$('#openBtn').onclick = () => $('#fileIn').click();
+$('#fileIn').onchange = e => {
+  const list = [...e.target.files];
+  if(!list.length) return;
+  files = list; renderSongSel(); loadFile(0);
+  e.target.value = '';
+};
+$('#songSel').onchange = e => loadFile(+e.target.value);
+function renderSongSel(){
+  const sel = $('#songSel');
+  sel.innerHTML = '';
+  files.forEach((f,i) => { const o = document.createElement('option'); o.value = i; o.textContent = f.name; sel.appendChild(o); });
+  const multi = files.length > 1;
+  sel.classList.toggle('hidden', !multi);
+  $('#title').classList.toggle('hidden', multi);
+}
+// 再生位置を曲ごとに保存（曲の切り替え・一時停止・ページを閉じる時など）
+function savePos(){
+  if(!key || switching || !dur()) return;
+  song.pos = now(); lastPosSave = Date.now(); save();
+}
+function updateTitle(){
+  document.title = curIdx < 0 ? '練習プレイヤー' : (audio.paused ? '♪ ' : '▶ ') + files[curIdx].name;
+}
+// 曲は「拡張子を除いたファイル名」で見分ける（wav → m4a に変換しても同じ曲として扱う）
+function songName(fname){ return fname.replace(/\.[^.]+$/, '').normalize('NFC'); }
+function songKey(fname){ return PREFIX + songName(fname); }
+// 旧バージョン（ファイル名＋サイズで保存）のデータを引き継ぐ
+function migrateOld(f){
+  const old = PREFIX + f.name + '|' + f.size, v = store.get(old);
+  if(v && !store.get(songKey(f.name))){ store.set(songKey(f.name), v); try{ localStorage.removeItem(old); }catch(e){} }
+}
+
+/* Sound it! 8 が WAV に保存したマーカー（iwem チャンク）を読む */
+async function readSoundItMarkers(file){
+  if(!/\.wav$/i.test(file.name)) return [];
+  const view = async (pos, len) => new DataView(await file.slice(pos, pos + len).arrayBuffer());
+  const tag = (dv, o) => String.fromCharCode(dv.getUint8(o), dv.getUint8(o + 1), dv.getUint8(o + 2), dv.getUint8(o + 3));
+  const h = await view(0, 12);
+  if(h.byteLength < 12 || tag(h, 0) !== 'RIFF' || tag(h, 8) !== 'WAVE') return [];
+  let pos = 12, sr = 0, iwem = null;
+  for(let guard = 0; pos + 8 <= file.size && guard < 200; guard++){
+    const c = await view(pos, 8); const id = tag(c, 0), size = c.getUint32(4, true);
+    if(id === 'fmt ') sr = (await view(pos + 8, 8)).getUint32(4, true);
+    else if(id === 'iwem') iwem = new Uint8Array(await file.slice(pos + 8, pos + 8 + size).arrayBuffer());
+    pos += 8 + size + (size & 1);
+  }
+  if(!iwem || !sr) return [];
+  const dv = new DataView(iwem.buffer), dec = new TextDecoder('shift_jis'), out = [];
+  const find = from => { for(let i = from; i + 5 <= iwem.length; i++) if(iwem[i] === 77 && iwem[i+1] === 107 && iwem[i+2] === 84 && iwem[i+3] === 97 && iwem[i+4] === 103) return i; return -1; }; // "MkTag"
+  for(let i = find(0); i >= 0 && i + 17 <= iwem.length; ){
+    const len = dv.getUint32(i + 5), b = i + 9;
+    if(b + 8 > iwem.length) break;
+    const sample = dv.getUint32(b), ll = dv.getUint32(b + 4);
+    let lab = dec.decode(iwem.subarray(b + 8, Math.min(iwem.length, b + 8 + ll)));
+    lab = lab.split(String.fromCharCode(0))[0].trim();
+    out.push({ t: Math.round(sample / sr * 1000) / 1000, label: lab });
+    i = find(b + len);
+  }
+  return out.sort((x, y) => x.t - y.t);
+}
+async function importSoundIt(f, k){
+  try{
+    const ms = await readSoundItMarkers(f);
+    if(!ms.length || k !== key || song.markers.length) return;
+    song.markers = ms; song.sitUpdated = f.lastModified || Date.now(); save(); renderMarkers(); drawWave();
+    toast(`Sound it! のマーカー ${ms.length}件を取り込みました`);
+  }catch(e){}
+}
+
+function loadFile(i){
+  const f = files[i]; if(!f) return;
+  if(i !== curIdx) savePos();          // 切り替え前の曲の位置を保存
+  switching = true;
+  audio.pause();
+  if(audio.src) URL.revokeObjectURL(audio.src);
+  migrateOld(f);
+  curIdx = i; key = songKey(f.name);
+  $('#songSel').value = i; $('#title').textContent = f.name;
+  const saved = store.get(key);
+  song = Object.assign(blankSong(), saved || {});
+  song.name = f.name;
+  audio.src = URL.createObjectURL(f);
+  setPitchLock(); applyRate();
+  view.start = 0; lastTime = 0; peaks = null; editIdx = -1;
+  if(saved && (saved.markers.length || saved.a != null)) toast(`保存済み：マーカー ${saved.markers.length}件` + (saved.a != null ? '・A-B区間' : '') + ' を読み込みました');
+  if('mediaSession' in navigator){ try{ navigator.mediaSession.metadata = new MediaMetadata({ title: f.name, artist: '練習プレイヤー' }); }catch(e){} }
+  const startPos = song.pos || 0;
+  audio.addEventListener('loadedmetadata', () => {
+    if(startPos > 0 && startPos < dur() - 0.5){ audio.currentTime = startPos; lastTime = startPos; ensureVisible(true); refresh(); }
+    switching = false;
+  }, { once: true });
+  updateTitle();
+  renderAll();
+  computePeaks(f, key);
+  if(!song.markers.length) importSoundIt(f, key);
+}
+audio.addEventListener('loadedmetadata', () => { applyRate(); renderAll(); });
+audio.addEventListener('error', () => { switching = false; if(curIdx >= 0) toast('この音源はこの端末で再生できない形式です'); });
+
+/* ---------- waveform peaks ---------- */
+async function computePeaks(file, k){
+  waveMsg = '波形を解析中…'; drawWave();
+  try{
+    const buf = await file.arrayBuffer();
+    const Ctx = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+    let ctx;
+    try{ ctx = new Ctx(1, 1, 8000); }               // 8kHzに変換して省メモリで解析
+    catch(e){ ctx = new Ctx(1, 1, 22050); }        // 古い iPhone は 8kHz を使えないため
+    // 古い Safari はコールバック形式なので両方に対応
+    const ab = await new Promise((res, rej) => { const p = ctx.decodeAudioData(buf, res, rej); if(p && p.then) p.then(res, rej); });
+    if(k !== key) return;
+    const len = ab.length, step = Math.max(1, Math.floor(ab.sampleRate / PEAKS_PER_SEC));
+    const count = Math.ceil(len / step), out = new Float32Array(count);
+    for(let c = 0; c < ab.numberOfChannels; c++){
+      const d = ab.getChannelData(c);
+      for(let i = 0; i < count; i++){
+        let m = out[i]; const s = i * step, e = Math.min(len, s + step);
+        for(let j = s; j < e; j++){ const v = d[j] < 0 ? -d[j] : d[j]; if(v > m) m = v; }
+        out[i] = m;
+      }
+    }
+    let mx = 0; for(let i = 0; i < count; i++) if(out[i] > mx) mx = out[i];
+    if(mx > 0) for(let i = 0; i < count; i++) out[i] = Math.sqrt(out[i] / mx); // 小さい音も見やすく
+    peaks = { data: out, perSec: ab.sampleRate / step };
+    waveMsg = '';
+  }catch(err){
+    if(k !== key) return;
+    peaks = null; waveMsg = '波形を表示できない形式です（再生・マーカーは使えます）';
+  }
+  drawWave();
+}
+
+/* ---------- waveform drawing ---------- */
+const cv = $('#wave');
+let colors = {};
+function readColors(){
+  const cs = getComputedStyle(document.documentElement);
+  ['wave','played','loop','ab-wave','ab-played','a','b','marker','head','muted'].forEach(n => colors[n] = cs.getPropertyValue('--' + n).trim());
+}
+readColors();
+try{ matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { readColors(); drawWave(); }); }catch(e){}
+
+function span(){ return dur() / view.zoom; }
+function clampView(){ const sp = span(); view.start = Math.min(Math.max(0, view.start), Math.max(0, dur() - sp)); }
+function ensureVisible(force){
+  if(view.zoom <= 1 || !dur()) return;
+  if(!force && Date.now() - lastUserScroll < 3000) return;
+  const sp = span(), t = now();
+  if(t < view.start + sp * 0.05 || t > view.start + sp * 0.9){ view.start = t - sp * 0.2; clampView(); }
+}
+
+function drawWave(){
+  const dpr = window.devicePixelRatio || 1;
+  const W = cv.clientWidth, H = cv.clientHeight;
+  if(!W || !H) return;
+  if(cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)){ cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); }
+  const g = cv.getContext('2d');
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  g.clearRect(0, 0, W, H);
+  const D = dur();
+  if(!D || !peaks){
+    g.fillStyle = colors.muted; g.font = '15px system-ui,sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillText(curIdx < 0 ? '「曲を開く」から音源を選んでください' : (waveMsg || '読み込み中…'), W / 2, H / 2);
+    if(!D) return;
+  }
+  clampView();
+  const sp = span(), t0 = view.start, X = t => (t - t0) / sp * W, cur = now();
+
+  const hasAB = song.a != null && song.b != null;
+  if(hasAB){
+    // リピートONなら濃く、OFFなら薄く区間の背景を塗る
+    g.globalAlpha = song.loop ? 1 : 0.5;
+    g.fillStyle = colors.loop; g.fillRect(X(song.a), 0, X(song.b) - X(song.a), H);
+    g.globalAlpha = 1;
+  }
+  if(peaks){
+    const d = peaks.data, ps = peaks.perSec, mid = H / 2, amp = H / 2 - 3;
+    for(let px = 0; px < W; px++){
+      const ta = t0 + px / W * sp, tb = t0 + (px + 1) / W * sp;
+      const i0 = Math.floor(ta * ps), i1 = Math.max(i0 + 1, Math.floor(tb * ps));
+      let m = 0; for(let i = i0; i < i1 && i < d.length; i++) if(d[i] > m) m = d[i];
+      const h = Math.max(0.5, m * amp);
+      const inAB = hasAB && ta >= song.a && ta < song.b;
+      g.fillStyle = inAB ? (ta < cur ? colors['ab-played'] : colors['ab-wave'])
+                         : (ta < cur ? colors.played : colors.wave);
+      g.fillRect(px, mid - h, 1, h * 2);
+    }
+  }
+  // markers
+  g.font = 'bold 12px system-ui,sans-serif'; g.textBaseline = 'top'; g.textAlign = 'left';
+  song.markers.forEach((m, i) => {
+    const x = X(m.t); if(x < -20 || x > W + 1) return;
+    g.fillStyle = colors.marker; g.fillRect(x - 1, 0, 2, H);
+    const label = String(i + 1), tw = g.measureText(label).width + 8;
+    g.fillRect(x, 0, tw, 16); g.fillStyle = '#fff'; g.fillText(label, x + 4, 2);
+  });
+  // A / B
+  [['a', 'A'], ['b', 'B']].forEach(([k, l]) => {
+    if(song[k] == null) return; const x = X(song[k]);
+    g.fillStyle = colors[k]; g.fillRect(x - 1.5, 0, 3, H);
+    g.fillRect(k === 'a' ? x : x - 16, H - 16, 16, 16);
+    g.fillStyle = '#fff'; g.textAlign = 'center'; g.fillText(l, k === 'a' ? x + 8 : x - 8, H - 15); g.textAlign = 'left';
+  });
+  // playhead
+  const hx = X(cur); g.fillStyle = colors.head; g.fillRect(hx - 1, 0, 2, H);
+}
+
+/* waveform touch: tap = seek, drag = scroll (when zoomed) */
+let drag = null;
+cv.addEventListener('pointerdown', e => { if(!dur()) return; cv.setPointerCapture(e.pointerId); drag = { x: e.clientX, start: view.start, moved: false }; });
+cv.addEventListener('pointermove', e => {
+  if(!drag) return;
+  const dx = e.clientX - drag.x;
+  if(Math.abs(dx) > 8) drag.moved = true;
+  if(drag.moved && view.zoom > 1){ view.start = drag.start - dx / cv.clientWidth * span(); clampView(); lastUserScroll = Date.now(); drawWave(); }
+});
+cv.addEventListener('pointerup', e => {
+  if(!drag) return;
+  if(!drag.moved){ const r = cv.getBoundingClientRect(); seek(view.start + (e.clientX - r.left) / r.width * span()); }
+  drag = null;
+});
+cv.addEventListener('pointercancel', () => drag = null);
+
+function setZoom(z){
+  if(!dur()) return;
+  z = Math.min(64, Math.max(1, z));
+  const center = now(); view.zoom = z;
+  view.start = center - span() / 2; clampView();
+  $('#zoomLbl').textContent = '×' + z; drawWave();
+}
+$('#zoomIn').onclick = () => setZoom(view.zoom * 2);
+$('#zoomOut').onclick = () => setZoom(view.zoom / 2);
+function applyHeight(){
+  cv.style.height = HEIGHTS[prefs.height] + 'px';
+  document.querySelectorAll('[data-h]').forEach(b => b.classList.toggle('on', b.dataset.h === prefs.height));
+  drawWave();
+}
+document.querySelectorAll('[data-h]').forEach(b => b.onclick = () => { prefs.height = b.dataset.h; store.set('renshu:prefs', prefs); applyHeight(); });
+new ResizeObserver(() => drawWave()).observe(cv);
+// 上の固定部分（波形・再生ボタン）の高さ：右列をそのすぐ下に固定するために使う
+new ResizeObserver(() => document.documentElement.style.setProperty('--top-h', $('.top').offsetHeight + 'px')).observe($('.top'));
+
+/* ---------- transport ---------- */
+function togglePlay(){
+  if(needSong()) return;
+  if(audio.paused){
+    if(song.loop && song.a != null && song.b != null && (now() < song.a || now() >= song.b)) seek(song.a);
+    audio.play().catch(() => toast('再生できませんでした'));
+  } else audio.pause();
+}
+$('#play').onclick = togglePlay;
+$('#toStart').onclick = () => seek(0);
+$('#back5').onclick = () => seek(now() - 5);
+$('#fwd5').onclick = () => seek(now() + 5);
+function prevMarker(){
+  if(needSong()) return;
+  const t = now() - (audio.paused ? 0.05 : 0.8);   // 再生中は少し手前を無視（連打で更に前へ）
+  const p = song.markers.filter(m => m.t < t).pop();
+  seek(p ? p.t : 0);
+}
+function nextMarker(){
+  if(needSong()) return;
+  const n = song.markers.find(m => m.t > now() + 0.05);
+  if(n) seek(n.t); else toast('この先にマーカーはありません');
+}
+$('#prevM').onclick = prevMarker;
+$('#nextM').onclick = nextMarker;
+
+audio.addEventListener('play', () => { $('#play').textContent = '❚❚'; requestAnimationFrame(tick); keepAwake(true); updateTitle(); });
+audio.addEventListener('pause', () => { $('#play').textContent = '▶'; refresh(); keepAwake(false); updateTitle(); savePos(); });
+audio.addEventListener('timeupdate', () => {
+  checkLoop();
+  if(!audio.paused && Date.now() - lastPosSave > 5000) savePos();
+  if(document.hidden) return; if(audio.paused) refresh();
+});
+window.addEventListener('pagehide', savePos);
+document.addEventListener('visibilitychange', () => { if(document.hidden) savePos(); });
+audio.addEventListener('ended', () => {
+  if(song.loop && song.a != null && song.b != null){ audio.currentTime = song.a; lastTime = song.a; audio.play(); }
+});
+
+function checkLoop(){
+  const t = now();
+  if(song.loop && song.a != null && song.b != null && lastTime < song.b && t >= song.b){
+    audio.currentTime = song.a; lastTime = song.a; ensureVisible(true); return;
+  }
+  lastTime = t;
+}
+function tick(){
+  if(audio.paused) return;
+  checkLoop(); ensureVisible(false); refresh();
+  requestAnimationFrame(tick);
+}
+
+/* ---------- screen wake lock & media session ---------- */
+async function keepAwake(on){
+  try{
+    if(on && 'wakeLock' in navigator && !wakeLock){ wakeLock = await navigator.wakeLock.request('screen'); wakeLock.addEventListener('release', () => wakeLock = null); }
+    if(!on && wakeLock){ await wakeLock.release(); wakeLock = null; }
+  }catch(e){}
+}
+document.addEventListener('visibilitychange', () => { if(!document.hidden && !audio.paused) keepAwake(true); });
+if('mediaSession' in navigator){
+  const ms = navigator.mediaSession;
+  const h = (a, f) => { try{ ms.setActionHandler(a, f); }catch(e){} };
+  h('play', () => audio.play()); h('pause', () => audio.pause());
+  h('seekbackward', () => seek(now() - 5)); h('seekforward', () => seek(now() + 5));
+  h('previoustrack', prevMarker); h('nexttrack', nextMarker);
+}
+
+/* ---------- A-B ---------- */
+function setPoint(k, t){
+  if(needSong()) return;
+  song[k] = t == null ? null : Math.min(Math.max(0, t), dur() || t);
+  if(song.a != null && song.b != null && song.a > song.b){ const x = song.a; song.a = song.b; song.b = x; }
+  if(song.a != null && song.b != null && song.a === song.b) song.b = null;
+  save(); renderMarkers(); drawWave();
+}
+$('#setA').onclick = () => setPoint('a', now());
+$('#setB').onclick = () => { if(!needSong() && song.a != null && now() <= song.a){ toast('B点はA点より後にしてください'); return; } setPoint('b', now()); if(song.a != null && song.b != null && !song.loop){ song.loop = true; save(); renderAB(); toast('A-Bリピートを ON にしました'); } };
+$('#aM').onclick = () => song.a != null && setPoint('a', song.a - 0.1);
+$('#aP').onclick = () => song.a != null && setPoint('a', song.a + 0.1);
+$('#bM').onclick = () => song.b != null && setPoint('b', song.b - 0.1);
+$('#bP').onclick = () => song.b != null && setPoint('b', song.b + 0.1);
+$('#loopBtn').onclick = () => {
+  if(needSong()) return;
+  if(song.a == null || song.b == null){ toast('A点とB点を両方決めてください'); return; }
+  song.loop = !song.loop; save(); renderAB();
+  if(song.loop && (now() < song.a || now() >= song.b)) seek(song.a);
+};
+$('#goA').onclick = () => { if(song.a != null) seek(song.a); else toast('A点がまだありません'); };
+$('#clearAB').onclick = () => { if(needSong()) return; song.a = song.b = null; song.loop = false; save(); renderMarkers(); drawWave(); };
+// A点・B点と同じ位置にあるマーカーの番号（なければ0）
+function markerNo(t){ if(t == null) return 0; return song.markers.findIndex(m => Math.abs(m.t - t) < 0.05) + 1; }
+function renderAB(){
+  $('#aTxt').textContent = fmt(song.a);
+  $('#bTxt').textContent = fmt(song.b);
+  [['a', '#aNo'], ['b', '#bNo']].forEach(([k, id]) => {
+    const n = markerNo(song[k]), el = $(id);
+    el.textContent = n ? 'マーカー ' + n : '';
+    el.classList.toggle('show', !!n);
+  });
+  const lb = $('#loopBtn');
+  lb.textContent = song.loop ? '🔁 リピート ON' : '🔁 リピート OFF';
+  lb.classList.toggle('on', !!song.loop);
+}
+
+/* ---------- speed ---------- */
+function applyRate(){
+  const r = song.rate || 1;
+  audio.defaultPlaybackRate = r; audio.playbackRate = r;
+  $('#rateTxt').textContent = Math.round(r * 100) + '%';
+  $('#rateRange').value = Math.round(r * 100);
+  document.querySelectorAll('[data-r]').forEach(b => b.classList.toggle('on', +b.dataset.r === Math.round(r * 100)));
+}
+function setRate(pct){
+  pct = Math.min(200, Math.max(25, Math.round(pct)));
+  song.rate = pct / 100; applyRate(); if(key) save();
+}
+$('#rM').onclick = () => setRate(Math.round(song.rate * 100) - 5);
+$('#rP').onclick = () => setRate(Math.round(song.rate * 100) + 5);
+$('#rateRange').oninput = e => setRate(+e.target.value);
+document.querySelectorAll('[data-r]').forEach(b => b.onclick = () => setRate(+b.dataset.r));
+
+/* ---------- markers ---------- */
+function addMarker(){
+  if(needSong()) return;
+  const t = now();
+  if(song.markers.some(m => Math.abs(m.t - t) < 0.15)){ toast('ほぼ同じ位置にマーカーがあります'); return; }
+  song.markers.push({ t, label: '' });
+  song.markers.sort((x, y) => x.t - y.t);
+  saveM(); renderMarkers(); drawWave();
+  toast(`マーカー ${song.markers.findIndex(m => m.t === t) + 1} を追加（${fmt(t)}）`);
+}
+$('#addM').onclick = addMarker;
+$('#addM2').onclick = addMarker;
+
+let editIdx = -1, listClosed = !!prefs.listClosed;
+function applyListClosed(){
+  $('#mlist').classList.toggle('closed', listClosed);
+  $('#mToggle').textContent = listClosed ? '一覧を開く' : '一覧を閉じる';
+}
+$('#mToggle').onclick = () => { listClosed = !listClosed; prefs.listClosed = listClosed; store.set('renshu:prefs', prefs); applyListClosed(); };
+
+function renderMarkers(){
+  const ul = $('#mlist'); ul.innerHTML = '';
+  $('#mcount').textContent = song.markers.length ? `（${song.markers.length}）` : '';
+  applyListClosed();
+  renderAB();
+  lastNear = -2;
+  if(!song.markers.length){ const li = document.createElement('li'); li.className = 'empty'; li.textContent = curIdx < 0 ? '曲を開くとマーカーを付けられます' : '再生中に「＋」を押すとマーカーが付きます'; ul.appendChild(li); return; }
+  song.markers.forEach((m, i) => {
+    const li = document.createElement('li'); li.className = 'mrow'; li.dataset.i = i;
+    li.innerHTML = `<button class="mgo" data-act="go" aria-label="マーカー${i + 1}へ移動"><span class="mnum">${i + 1}</span><span class="mtxt"><span class="mtime">${fmt(m.t)}</span><span class="mlabel"></span></span></button>
+      <button class="ma${markerNo(song.a) === i + 1 ? ' sel' : ''}" data-act="a" aria-label="A点にする">A</button>
+      <button class="mb${markerNo(song.b) === i + 1 ? ' sel' : ''}" data-act="b" aria-label="B点にする">B</button>
+      <button data-act="edit" aria-label="名前・削除">${editIdx === i ? '✕' : '✎'}</button>`;
+    li.querySelector('.mlabel').textContent = m.label || 'タップで移動';
+    if(editIdx === i){
+      const ed = document.createElement('div'); ed.className = 'medit';
+      ed.innerHTML = `<input type="text" placeholder="名前（例：サビ）" maxlength="30"><button data-act="here">今の位置へ</button><button class="del" data-act="del">削除</button>`;
+      const inp = ed.querySelector('input'); inp.value = m.label || '';
+      inp.onchange = () => { m.label = inp.value.trim(); saveM(); li.querySelector('.mlabel').textContent = m.label || 'タップで移動'; };
+      li.appendChild(ed);
+    }
+    li.onclick = e => {
+      const btn = e.target.closest('[data-act]'); if(!btn) return;
+      const act = btn.dataset.act;
+      if(act === 'go') seek(m.t);
+      else if(act === 'a') setPoint('a', m.t);
+      else if(act === 'b'){ if(song.a != null && m.t <= song.a){ toast('B点はA点より後にしてください'); return; } setPoint('b', m.t); }
+      else if(act === 'edit'){ editIdx = editIdx === i ? -1 : i; renderMarkers(); }
+      else if(act === 'here'){ m.t = now(); song.markers.sort((x, y) => x.t - y.t); editIdx = song.markers.indexOf(m); saveM(); renderMarkers(); drawWave(); }
+      else if(act === 'del'){ if(confirm(`マーカー ${i + 1}（${fmt(m.t)}${m.label ? ' ' + m.label : ''}）を削除しますか？`)){ song.markers.splice(i, 1); editIdx = -1; saveM(); renderMarkers(); drawWave(); } }
+    };
+    ul.appendChild(li);
+  });
+  highlightNear();
+}
+var lastNear = -2;
+function highlightNear(){
+  const t = now(); let idx = -1;
+  song.markers.forEach((m, i) => { if(m.t <= t + 0.05) idx = i; });
+  if(idx === lastNear) return; lastNear = idx;
+  document.querySelectorAll('#mlist .mrow').forEach(li => li.classList.toggle('near', +li.dataset.i === idx));
+}
+
+/* ---------- export / import ---------- */
+$('#exportBtn').onclick = () => {
+  const data = {};
+  store.keys().filter(k => k.startsWith(PREFIX)).forEach(k => data[k.slice(PREFIX.length)] = store.get(k));
+  const n = Object.keys(data).length;
+  if(!n){ toast('保存データがまだありません'); return; }
+  const blob = new Blob([JSON.stringify({ app: 'renshu-player', version: 2, songs: data }, null, 1)], { type: 'application/json' });
+  const a = document.createElement('a');
+  const d = new Date(), pad = x => String(x).padStart(2, '0');
+  const fname = `練習プレイヤー_マーカー_${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}.json`;
+  // iPhone / iPad は共有シートから「"ファイル"に保存」で保存する（ホーム画面のアプリではダウンロードが使えないため）
+  const isIOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  if(isIOS && navigator.canShare){
+    const file = new File([blob], fname, { type: 'application/json' });
+    if(navigator.canShare({ files: [file] })){
+      navigator.share({ files: [file] }).then(() => toast(`${n}曲分のデータを書き出しました`)).catch(() => {});
+      return;
+    }
+  }
+  a.href = URL.createObjectURL(blob);
+  a.download = fname;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  toast(`${n}曲分のデータを書き出しました`);
+};
+$('#importBtn').onclick = () => $('#importIn').click();
+$('#importIn').onchange = async e => {
+  const f = e.target.files[0]; e.target.value = ''; if(!f) return;
+  try{
+    const j = JSON.parse(await f.text());
+    if(!j || j.app !== 'renshu-player' || !j.songs) throw 0;
+    let n = 0;
+    let skip = 0;
+    for(let [k, v] of Object.entries(j.songs)){
+      if(!v || !Array.isArray(v.markers)) continue;
+      if(!(j.version >= 2)) k = songName(k.replace(/\|\d+$/, ''));   // 旧形式「名前.wav|サイズ」
+      k = k.normalize('NFC');
+      const exist = store.get(PREFIX + k);
+      if(j.origin === 'soundit'){
+        // 変換スクリプトが作った Sound it! のマーカー：マーカーだけを入れ替え、A-B・速度・再生位置は残す
+        if(!v.markers.length) continue;
+        const sit = v.updated || 1;
+        if(exist && exist.markers.length){
+          if(sit <= (exist.sitUpdated || 0)) continue;   // 前回から Sound it! 側の変更なし
+          // アプリでマーカーを変えた日時（古い版のデータは保存日時で代用）
+          const appEdit = exist.mUpdated != null ? exist.mUpdated : (exist.sitUpdated ? 0 : (exist.updated || 0));
+          if(appEdit >= sit){ skip++; continue; }        // アプリでの変更のほうが新しい
+        }
+        v = Object.assign(exist || blankSong(), { markers: v.markers, sitUpdated: sit });
+      }
+      // すでにこの端末にデータがある曲は、より新しく編集されたデータの時だけ上書き
+      else if(exist &&(exist.markers.length || exist.a != null) && !(v.updated && (!exist.updated || v.updated > exist.updated))){
+        // マーカーがまだ無い曲は、A-B・速度・再生位置はそのままにマーカーだけ入れる
+        if(!exist.markers.length && v.markers.length) v = Object.assign(exist, { markers: v.markers });
+        else { skip++; continue; }
+      }
+      if(!store.set(PREFIX + k, v)){ toast('保存領域がいっぱいで、途中までしか読み込めませんでした'); break; }
+      n++;
+    }
+    toast(`${n}曲分のデータを読み込みました` + (skip ? `（この端末で編集済みの ${skip}曲はそのまま）` : ''));
+    if(!n && !skip) toast('新しく変わったマーカーはありませんでした');
+    if(curIdx >= 0){ const keep = now(); loadFile(curIdx); audio.addEventListener('loadedmetadata', () => seek(keep), { once: true }); }
+  }catch(err){ toast('読み込めないファイルです'); }
+};
+
+/* ---------- render ---------- */
+function refresh(){
+  $('#tCur').textContent = fmt(now());
+  highlightNear();
+  drawWave();
+}
+function renderAll(){
+  $('#tDur').textContent = fmt(dur());
+  $('#zoomLbl').textContent = '×' + view.zoom;
+  renderAB(); applyRate(); renderMarkers(); refresh();
+}
+applyHeight(); renderAll();
+
+/* ---------- 試用版だけの停止スイッチ（本番版では何もしない） ----------
+   status.json の active を false にすると使えなくなる。until（例 "2026-12-31"）を過ぎても止まる。
+   最後に確認した状態を端末に覚えておくので、オフラインでも止まったまま。 */
+if(window.RENSHU_TRIAL){
+  const TK = 'renshu:trial';
+  let stopped = false;
+  const apply = s => {
+    if(!s) return;
+    const expired = !!s.until && Date.now() > new Date(s.until + 'T23:59:59').getTime();
+    stopped = s.active === false || expired;
+    let ov = $('#trialStop');
+    if(stopped){
+      audio.pause();
+      if(!ov){
+        ov = document.createElement('div'); ov.id = 'trialStop';
+        ov.innerHTML = '<div><h2>試用期間は終了しました</h2><p></p></div>';
+        document.body.appendChild(ov);
+      }
+      ov.querySelector('p').textContent = s.message || 'ご利用ありがとうございました。';
+    } else if(ov) ov.remove();
+  };
+  const check = () => fetch('status.json?t=' + Date.now(), { cache: 'no-store' })
+    .then(r => r.ok ? r.json() : null)
+    .then(s => { if(s){ store.set(TK, s); apply(s); } })
+    .catch(() => {});
+  apply(store.get(TK));
+  check();
+  document.addEventListener('visibilitychange', () => { if(!document.hidden) check(); });
+  audio.addEventListener('play', () => { if(stopped) audio.pause(); });
+}
+
+if('serviceWorker' in navigator && location.protocol.startsWith('http')){
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+})();
+</script>
+</body>
+</html>

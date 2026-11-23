@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>練習プレイヤー（試用版）の使い方</title>
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+:root{--bg:#f3f4f7;--panel:#fff;--text:#1b1f27;--muted:#5f6b7c;--line:#d8dde5;--accent:#2563eb;color-scheme:light}
+@media (prefers-color-scheme: dark){:root{--bg:#12161d;--panel:#1b2129;--text:#e8ecf2;--muted:#9aa6b6;--line:#2d3642;--accent:#6ea0ff;color-scheme:dark}}
+html,body{margin:0}
+body{background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif;font-size:17px;line-height:1.7;padding:0 max(16px,env(safe-area-inset-left)) 40px max(16px,env(safe-area-inset-right))}
+main{max-width:720px;margin:0 auto}
+h1{font-size:24px;margin:20px 0 4px}
+.lead{color:var(--muted);margin:0 0 16px}
+section{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin:12px 0}
+h2{font-size:18px;margin:0 0 6px}
+h3{font-size:16px;margin:10px 0 2px}
+ol,ul{margin:4px 0;padding-left:1.4em}
+li{margin:2px 0}
+.open{display:block;text-align:center;background:var(--accent);color:#fff;text-decoration:none;font-weight:700;border-radius:12px;padding:14px;margin:8px 0 4px}
+.note{color:var(--muted);font-size:15px}
+b{font-weight:700}
+</style>
+</head>
+<body>
+<main>
+<h1>練習プレイヤー（試用版）の使い方</h1>
+<p class="lead">マーカー・A-Bリピート・速度変更ができる、練習用の音楽プレイヤーです。iPhone・Android・パソコンのブラウザで使えます。</p>
+<a class="open" href="./">練習プレイヤーを開く</a>
+
+<section>
+<h2>データについて</h2>
+<ul>
+<li>曲・マーカー・A-B区間などは、<b>使っている端末の中だけ</b>に保存されます。</li>
+<li>インターネット上にデータが送られることはなく、ほかの人の曲やデータが見えることもありません。</li>
+<li>曲は、その端末に入っている音源ファイル（iPhoneなら「ファイル」アプリ内）から選びます。</li>
+</ul>
+</section>
+
+<section>
+<h2>1. ホーム画面に追加する（おすすめ）</h2>
+<h3>iPhone（Safari）</h3>
+<ol>
+<li>Safari でこのページの「練習プレイヤーを開く」を押します。</li>
+<li>画面下の共有ボタン（□に↑）→「ホーム画面に追加」を選びます。</li>
+<li>ホーム画面のアイコンから開きます。</li>
+</ol>
+<p class="note">iPhone では、ホーム画面に追加せずに Safari だけで使っていると、しばらく使わないうちに保存したマーカーが消えることがあります。ホーム画面に追加して使ってください。</p>
+<h3>Android（Chrome）</h3>
+<ol>
+<li>Chrome で開き、右上の「︙」→「ホーム画面に追加」（または「アプリをインストール」）を選びます。</li>
+</ol>
+</section>
+
+<section>
+<h2>2. 曲を入れる</h2>
+<ul>
+<li><b>iPhone</b>：音源ファイル（m4a・mp3・wav）を「ファイル」アプリの「このiPhone内」や iCloud Drive に保存します。パソコンからは AirDrop や iCloud Drive で送れます。<br><span class="note">「ミュージック」アプリに入っている曲は、仕組み上選べません。</span></li>
+<li><b>Android</b>：端末内・SDカード・Googleドライブのファイルを選べます。</li>
+</ul>
+</section>
+
+<section>
+<h2>3. 使い方</h2>
+<ul>
+<li><b>📂 曲を開く</b>：曲を選びます。何曲かまとめて選ぶと、上の一覧で切り替えられます。</li>
+<li><b>マーカー</b>：再生中に「＋ 今の位置にマーカー」を押すと付きます。番号をタップするとその位置へ移動します。✎ で名前の変更・削除ができます。</li>
+<li><b>A-Bリピート</b>：「A点をここに」「B点をここに」で区間を決めると、その間をくり返します。マーカーの A / B ボタンでも決められます。</li>
+<li><b>再生速度</b>：音の高さは変えずに、25%〜200% で速さを変えられます。</li>
+<li><b>波形</b>：タップでその位置へ移動。＋／－で拡大、「小・中・大」で高さを変えられます。</li>
+</ul>
+<p class="note">マーカーや速度は曲ごとに自動で保存され、次に同じ曲を開くと戻ります（ファイル名で見分けています）。</p>
+</section>
+
+<section>
+<h2>4. バックアップ・機種変更</h2>
+<ul>
+<li>「データ」の <b>💾 書き出し</b> で、マーカーなどを1つのファイルに保存できます（iPhone は「"ファイル"に保存」を選びます）。</li>
+<li>別の端末では <b>📥 読み込み</b> でそのファイルを選ぶと、同じマーカーが使えます。</li>
+</ul>
+</section>
+</main>
+</body>
+</html>
