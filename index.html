@@ -18,7 +18,7 @@
 :root{
   --bg:#f3f4f7; --panel:#ffffff; --text:#1b1f27; --muted:#5f6b7c; --line:#d8dde5;
   --btn:#e9edf3; --btn-press:#d5dce7; --accent:#2563eb; --accent-text:#ffffff;
-  --a:#15803d; --b:#c2410c; --marker:#b45309; --wave:#a3afc0; --played:#2563eb;
+  --a:#15803d; --b:#c2410c; --marker:#b45309; --wave:#a3afc0; --played:#2563eb; --mstart:#db2777;
   --loop:rgba(124,58,237,.13); --ab-wave:#c3a6f3; --ab-played:#7c3aed;
   --head:#111827; --on:#16a34a; --danger:#b91c1c;
   color-scheme: light;
@@ -27,7 +27,7 @@
   :root:not([data-theme="light"]){
     --bg:#12161d; --panel:#1b212b; --text:#e8ecf2; --muted:#9aa6b6; --line:#2e3744;
     --btn:#28303c; --btn-press:#343e4d; --accent:#3b82f6; --accent-text:#ffffff;
-    --a:#4ade80; --b:#fb923c; --marker:#fbbf24; --wave:#4b5768; --played:#60a5fa;
+    --a:#4ade80; --b:#fb923c; --marker:#fbbf24; --wave:#4b5768; --played:#60a5fa; --mstart:#f472b6;
     --loop:rgba(167,139,250,.16); --ab-wave:#6f5a9e; --ab-played:#b79cff;
     --head:#f8fafc; --on:#22c55e; --danger:#f87171;
     color-scheme: dark;
@@ -36,7 +36,7 @@
 :root[data-theme="dark"]{
   --bg:#12161d; --panel:#1b212b; --text:#e8ecf2; --muted:#9aa6b6; --line:#2e3744;
   --btn:#28303c; --btn-press:#343e4d; --accent:#3b82f6; --accent-text:#ffffff;
-  --a:#4ade80; --b:#fb923c; --marker:#fbbf24; --wave:#4b5768; --played:#60a5fa;
+  --a:#4ade80; --b:#fb923c; --marker:#fbbf24; --wave:#4b5768; --played:#60a5fa; --mstart:#f472b6;
   --loop:rgba(167,139,250,.16); --ab-wave:#6f5a9e; --ab-played:#b79cff;
   --head:#f8fafc; --on:#22c55e; --danger:#f87171;
   color-scheme: dark;
@@ -110,6 +110,11 @@ input[type=range]{width:100%;height:40px;accent-color:var(--accent)}
 .mlist.closed{display:none}
 .mrow{display:grid;grid-template-columns:1fr 48px 48px 48px;gap:6px;align-items:stretch;border:1px solid var(--line);border-radius:12px;padding:4px}
 .mrow.near{border-color:var(--marker);box-shadow:inset 4px 0 0 var(--marker)}
+/* 最後にそこから再生したマーカー（後から見て分かるように色を変える） */
+.mrow.start{border:2px solid var(--mstart);box-shadow:inset 6px 0 0 var(--mstart);padding:3px}
+.mrow.start .mnum{background:var(--mstart)}
+.mstart{display:none;color:var(--mstart);font-size:13px;font-weight:800;white-space:nowrap}
+.mrow.start .mstart{display:inline}
 .mrow button{min-height:48px;padding:0}
 .mgo{display:flex;align-items:center;gap:10px;text-align:left;background:transparent;padding:0 6px!important;min-width:0}
 .mnum{background:var(--marker);color:#fff;border-radius:8px;min-width:32px;height:32px;display:grid;place-items:center;font-weight:800;flex:none}
@@ -414,7 +419,7 @@ const cv = $('#wave');
 let colors = {};
 function readColors(){
   const cs = getComputedStyle(document.documentElement);
-  ['wave','played','loop','ab-wave','ab-played','a','b','marker','head','muted'].forEach(n => colors[n] = cs.getPropertyValue('--' + n).trim());
+  ['wave','played','loop','ab-wave','ab-played','a','b','marker','mstart','head','muted'].forEach(n => colors[n] = cs.getPropertyValue('--' + n).trim());
 }
 readColors();
 try{ matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { readColors(); drawWave(); }); }catch(e){}
@@ -469,7 +474,8 @@ function drawWave(){
   g.font = 'bold 12px system-ui,sans-serif'; g.textBaseline = 'top'; g.textAlign = 'left';
   song.markers.forEach((m, i) => {
     const x = X(m.t); if(x < -20 || x > W + 1) return;
-    g.fillStyle = colors.marker; g.fillRect(x - 1, 0, 2, H);
+    const st = isStart(m);                       // そこから再生したマーカーは別の色・太い線
+    g.fillStyle = st ? colors.mstart : colors.marker; g.fillRect(x - (st ? 1.5 : 1), 0, st ? 3 : 2, H);
     const label = String(i + 1), tw = g.measureText(label).width + 8;
     g.fillRect(x, 0, tw, 16); g.fillStyle = '#fff'; g.fillText(label, x + 4, 2);
   });
@@ -531,16 +537,22 @@ $('#play').onclick = togglePlay;
 $('#toStart').onclick = () => seek(0);
 $('#back5').onclick = () => seek(now() - 5);
 $('#fwd5').onclick = () => seek(now() + 5);
+// マーカーへ移動し、「そこから再生したマーカー」として覚える（曲ごとに保存）
+function isStart(m){ return song.startT != null && Math.abs(m.t - song.startT) < 0.001; }
+function goMarker(m){
+  seek(m.t);
+  if(!isStart(m)){ song.startT = m.t; save(); renderMarkers(); drawWave(); }
+}
 function prevMarker(){
   if(needSong()) return;
   const t = now() - (audio.paused ? 0.05 : 0.8);   // 再生中は少し手前を無視（連打で更に前へ）
   const p = song.markers.filter(m => m.t < t).pop();
-  seek(p ? p.t : 0);
+  if(p) goMarker(p); else seek(0);
 }
 function nextMarker(){
   if(needSong()) return;
   const n = song.markers.find(m => m.t > now() + 0.05);
-  if(n) seek(n.t); else toast('この先にマーカーはありません');
+  if(n) goMarker(n); else toast('この先にマーカーはありません');
 }
 $('#prevM').onclick = prevMarker;
 $('#nextM').onclick = nextMarker;
@@ -669,8 +681,8 @@ function renderMarkers(){
   lastNear = -2;
   if(!song.markers.length){ const li = document.createElement('li'); li.className = 'empty'; li.textContent = curIdx < 0 ? '曲を開くとマーカーを付けられます' : '再生中に「＋」を押すとマーカーが付きます'; ul.appendChild(li); return; }
   song.markers.forEach((m, i) => {
-    const li = document.createElement('li'); li.className = 'mrow'; li.dataset.i = i;
-    li.innerHTML = `<button class="mgo" data-act="go" aria-label="マーカー${i + 1}へ移動"><span class="mnum">${i + 1}</span><span class="mtxt"><span class="mtime">${fmt(m.t)}</span><span class="mlabel"></span></span></button>
+    const li = document.createElement('li'); li.className = 'mrow' + (isStart(m) ? ' start' : ''); li.dataset.i = i;
+    li.innerHTML = `<button class="mgo" data-act="go" aria-label="マーカー${i + 1}へ移動"><span class="mnum">${i + 1}</span><span class="mtxt"><span class="mtime">${fmt(m.t)} <span class="mstart">▶ ここから再生</span></span><span class="mlabel"></span></span></button>
       <button class="ma${markerNo(song.a) === i + 1 ? ' sel' : ''}" data-act="a" aria-label="A点にする">A</button>
       <button class="mb${markerNo(song.b) === i + 1 ? ' sel' : ''}" data-act="b" aria-label="B点にする">B</button>
       <button data-act="edit" aria-label="名前・削除">${editIdx === i ? '✕' : '✎'}</button>`;
@@ -685,12 +697,12 @@ function renderMarkers(){
     li.onclick = e => {
       const btn = e.target.closest('[data-act]'); if(!btn) return;
       const act = btn.dataset.act;
-      if(act === 'go') seek(m.t);
+      if(act === 'go') goMarker(m);
       else if(act === 'a') setPoint('a', m.t);
       else if(act === 'b'){ if(song.a != null && m.t <= song.a){ toast('B点はA点より後にしてください'); return; } setPoint('b', m.t); }
       else if(act === 'edit'){ editIdx = editIdx === i ? -1 : i; renderMarkers(); }
-      else if(act === 'here'){ m.t = now(); song.markers.sort((x, y) => x.t - y.t); editIdx = song.markers.indexOf(m); saveM(); renderMarkers(); drawWave(); }
-      else if(act === 'del'){ if(confirm(`マーカー ${i + 1}（${fmt(m.t)}${m.label ? ' ' + m.label : ''}）を削除しますか？`)){ song.markers.splice(i, 1); editIdx = -1; saveM(); renderMarkers(); drawWave(); } }
+      else if(act === 'here'){ if(isStart(m)) song.startT = now(); m.t = now(); song.markers.sort((x, y) => x.t - y.t); editIdx = song.markers.indexOf(m); saveM(); renderMarkers(); drawWave(); }
+      else if(act === 'del'){ if(confirm(`マーカー ${i + 1}（${fmt(m.t)}${m.label ? ' ' + m.label : ''}）を削除しますか？`)){ if(isStart(m)) song.startT = null; song.markers.splice(i, 1); editIdx = -1; saveM(); renderMarkers(); drawWave(); } }
     };
     ul.appendChild(li);
   });
