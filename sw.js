@@ -1,5 +1,5 @@
 // オフラインでも起動できるようにアプリ本体をキャッシュする
-const CACHE = 'renshu-trial-v15';
+const CACHE = 'renshu-trial-v16';
 const FILES = ['./', 'index.html', 'guide.html', 'manifest.webmanifest', 'icon.svg', 'icon-192.png', 'icon-512.png'];
 
 self.addEventListener('install', e => {

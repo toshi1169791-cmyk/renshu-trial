@@ -120,7 +120,9 @@ input[type=range]{width:100%;height:40px;accent-color:var(--accent)}
 .mnum{background:var(--marker);color:#fff;border-radius:8px;min-width:32px;height:32px;display:grid;place-items:center;font-weight:800;flex:none}
 .mtxt{display:flex;flex-direction:column;min-width:0;line-height:1.25}
 .mtime{font-variant-numeric:tabular-nums;font-weight:700}
-.mlabel{color:var(--muted);font-size:14px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* マーカーの名前（サビ・Aメロなど）は大きく太く。名前が無い時の「タップで移動」は小さく薄く */
+.mlabel{color:var(--text);font-size:20px;font-weight:800;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mlabel.none{color:var(--muted);font-size:14px;font-weight:500}
 .mrow .ma{color:var(--a)} .mrow .mb{color:var(--b)}
 .medit{grid-column:1/-1;display:grid;grid-template-columns:1fr auto auto;gap:6px;padding:4px 2px 2px}
 .medit input{min-width:0;min-height:48px;border-radius:10px;border:1px solid var(--line);background:var(--bg);padding:0 10px}
@@ -686,12 +688,13 @@ function renderMarkers(){
       <button class="ma${markerNo(song.a) === i + 1 ? ' sel' : ''}" data-act="a" aria-label="A点にする">A</button>
       <button class="mb${markerNo(song.b) === i + 1 ? ' sel' : ''}" data-act="b" aria-label="B点にする">B</button>
       <button data-act="edit" aria-label="名前・削除">${editIdx === i ? '✕' : '✎'}</button>`;
-    li.querySelector('.mlabel').textContent = m.label || 'タップで移動';
+    const setLabel = () => { const el = li.querySelector('.mlabel'); el.textContent = m.label || 'タップで移動'; el.classList.toggle('none', !m.label); };
+    setLabel();
     if(editIdx === i){
       const ed = document.createElement('div'); ed.className = 'medit';
       ed.innerHTML = `<input type="text" placeholder="名前（例：サビ）" maxlength="30"><button data-act="here">今の位置へ</button><button class="del" data-act="del">削除</button>`;
       const inp = ed.querySelector('input'); inp.value = m.label || '';
-      inp.onchange = () => { m.label = inp.value.trim(); saveM(); li.querySelector('.mlabel').textContent = m.label || 'タップで移動'; };
+      inp.onchange = () => { m.label = inp.value.trim(); saveM(); setLabel(); };
       li.appendChild(ed);
     }
     li.onclick = e => {
